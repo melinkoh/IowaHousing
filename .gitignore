@@ -1,1 +1,2 @@
-data/*.csv
+data/test.csv
+data/train.csv

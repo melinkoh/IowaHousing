@@ -15,10 +15,9 @@ test <- read.csv('../data/test.csv',header=T);
 # Define parameters for preprocessing
 corr_thresh = 0;
 skew_thresh = .75;
-min_abs_corr = 0;
 
 # Use the helper function, "transform", to do preprocessing
-output <- transform(train,test,corr_thresh,skew_thresh,min_abs_corr);
+output <- transform(train,test,corr_thresh,skew_thresh);
 train <- attr(output,"train");
 test <- attr(output,"test");
 highCor <- attr(output,"highCor");

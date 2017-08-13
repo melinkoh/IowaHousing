@@ -1,80 +1,93 @@
 #helper function for transforming data:
 
-#code below for preprocessing data adapted from:
-#https://piazza-resources.s3.amazonaws.com/iwgts4iuaq41h1/iyf5s5pqnnpae/Iowa_housing_Jan27.html?AWSAccessKeyId=AKIAIEDNRLJ4AZKBW6HA&Expires=1487739124&Signature=j5tv%2B0Qbf%2B6TZbb%2BZcoFTEiioUk%3D
-transform <- function(train,test,corr_thresh,skew_thresh,min_abs_corr){
+transform <- function(train,test,corr_thresh,skew_thresh){
   
   output <- list();
   
-  # apply function: use the given function (is.na) for each column (use 2 for column, and use 1 for row) 
-  # in the matrix train[, -c(1, 81)].
+  # Apply the given function (is.na) for each column (use 2 for column, and use 1 for row) in the matrix train[, -c(1, 81)].
   numNA = colSums(apply(train[, -c(1, 81)], 2, is.na))
-  number_of_missing = numNA[which(numNA != 0)]  # number of NA's
-  data_type = sapply(train[,names(which(numNA != 0))], class)  # type of data
-  cbind(number_of_missing, data_type)
-  ## dropping data with the most empty information
+  number_of_missing = numNA[which(numNA != 0)]  # variables with NA's and the numbers of NA's for each of them
+  
+  # Drop variables with a lot of NA's (>0.4 are NA's)
   drops = c("Alley", "PoolQC", "Fence", "MiscFeature", "FireplaceQU")
   train = train[ , !(names(train) %in% drops)]
   test = test[ , !(names(test) %in% drops)]
   
-  data.type = sapply(train[, -c(1, ncol(train))], class)  # as we've removed 4 variables
+  # Find out the numerical variables and the categorical variables
+  data.type = sapply(train[, -c(1, ncol(train))], class)  # data type for all variables except Id and SalePrice
   cat_var = names(train)[which(c(NA, data.type, NA) == 'factor')]  # categorical variables
-  numeric_var =  names(train)[which(c(NA, data.type, NA) == 'integer')]  # continuous variables
+  numeric_var =  names(train)[which(c(NA, data.type, NA) == 'integer')]  # numerical variables
+  
+  # For the categorical variables, add <NA> as a new level
   for (j in cat_var){
-    train[, j] = addNA(train[, j])  # addNA treat the NA's as a new level called '<NA>'
+    train[, j] = addNA(train[, j])  
     test[, j] = addNA(test[, j])
   }
   
-  tempVar = c('LotFrontage', 'MasVnrArea', 'GarageYrBlt')
+  # For the numerical variables with NA's, replace the NA's with medians
+  numWithNA = number_of_missing[names(number_of_missing) %in% numeric_var]
+  tempVar = names(numWithNA)
+  print(tempVar)
   for (j in tempVar){
-    na.id = is.na(train[, j])  # binary indicator: NA (1) or not (0)
-    tempMedian = median(train[, j], na.rm = TRUE)  # find the median
-    train[which(na.id), j] = tempMedian
+    
+    na.id = is.na(train[,j])  # Find the NA values
+    tempMedian = median(train[,j],na.rm=TRUE)  # find the median
+    train[which(na.id),j] = tempMedian
+    
+    na.id = is.na(test[,j])
+    tempMedian = median(test[,j],na.rm=TRUE)
+    test[which(na.id),j] = tempMedian
+    
   }
   
-  for (j in numeric_var){
-    na.id = is.na(test[, j])
-    if (!any(na.id)){
-      next
-    }
-    test[which(na.id), j] = median(train[, j])
-  }
   
+  
+  # Replace the numerical values 
+  #for (j in numeric_var){
+  #  na.id = is.na(test[, j])
+  #  if (!any(na.id)){
+  #    next
+  #  }
+  #  test[which(na.id), j] = median(train[, j])
+  #}
+  
+  # Apply log transform to the SalePrice column
   train$SalePrice <- log(train$SalePrice + 1 )
   
+  # The original test data loaded from Kaggle does not contain SalePrice,
+  #   but if the test data input for this function is obtained from splitting the original train data (for cross-validation)
+  #   then the test data will have a SalePrice column, in which case we need to log-tranform it as well
   if("SalePrice" %in% names(test)){
     test$SalePrice <- log(test$SalePrice + 1 )
   }
   
-  # for numeric feature with excessive skewness, perform log transformation
-  # determine skew for each numeric feature
+  # For numeric features with excessive skewness (> skew_thresh), perform log transformation
   skewed_feats = sapply(train[, numeric_var], skewness)
-  # only log transform features that exceed a threshold = 0.75 for skewness
   skewed_feats = numeric_var[which(skewed_feats > skew_thresh)]
   for(j in skewed_feats) {
     train[, j] = log(train[, j] + 1)
     test[, j] = log(test[, j] + 1)
   }
   
+  # Obtain the correlation matrix 
   correlations = cor(train[, c(numeric_var, 'SalePrice')])  # correlation matrix
   
-  #for those relatively large correlations (> 0.3)
-  row_indic = apply(correlations, 1, function(x) sum(abs(x) > min_abs_corr) > 1)
-  correlations = correlations[row_indic, row_indic]
-  
+  # Pick the variables with high correlations with SalePrice (exceeding corr_thresh)
   highCor = which(abs(correlations[, ncol(correlations)]) > corr_thresh)
   highCor = highCor[-length(highCor)]
   names(highCor)
   
+  # Put the updated train, test and highCor to the output list
   attr(output,'train') = train;
   attr(output,'test') = test;
   attr(output,'highCor') = highCor;
+  print(class(output))
   
   return(output);
 }
 
 
-##compute root mean squared error between x and y
+# Compute root mean squared error between x and y
 RMSE <- function(x,y){
   a <- sqrt(sum((log(x)-log(y))^2)/length(y))
   return(a)
