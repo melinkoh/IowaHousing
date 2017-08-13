@@ -52,7 +52,9 @@ ytest = predict(cv.out,newx=Xtest,s="lambda.1se")
 ytest = exp(ytest) - 1
 
 # Write the predictions to a file
-submission = read.csv('../sample_prediction_file.csv')
+submission = read.csv('../sample_submission.csv')
 submission$SalePrice = ytest
 write.table(submission, 'prediction.csv', row.names = FALSE, sep = ',')
 
+# Change the directory back to the main directory
+setwd("..")

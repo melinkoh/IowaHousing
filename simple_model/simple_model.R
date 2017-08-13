@@ -30,7 +30,9 @@ yHat = predict(mlr, newdata = test);
 yHat = exp(yHat) - 1;
 
 # Write the predictions to a file
-submission = read.csv('../sample_prediction_file.csv')
+submission = read.csv('../sample_submission.csv')
 submission$SalePrice = yHat
 write.table(submission, 'prediction.csv', row.names = FALSE, sep = ',')
 
+# Change the directory back to the main directory
+setwd("..")
